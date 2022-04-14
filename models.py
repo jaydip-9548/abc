@@ -12,9 +12,6 @@ from django_q.tasks import async_task
 
 # Create your models here.
 class SubAccountDetails(models.Model):
-    # email = models.ForeignKey(AccountableUser, to_field="email", on_delete=DO_NOTHING)
-    account_id = models.ForeignKey(AccountableUser, on_delete=CASCADE)
-    # sub-acc id is number but its too big to store in integer type
     sub_account_id = models.TextField()
     sub_account_email = models.EmailField(unique=True)
     sub_account_api_key = models.TextField()
@@ -41,6 +38,7 @@ class SubAccountDetails(models.Model):
                 id=user_sub_account.sub_account_detail_id_id,
                 is_active=True
             )
+            
             # return sub_account
         except Exception as e:
             # Check if there is any account exists where is_active = False
@@ -82,7 +80,7 @@ class SubAccountDetails(models.Model):
                 except Exception as e:
                     raise e
 
-                # inserting sub-account data into  model
+                # inserting sub-account data into model
                 sub_account = SubAccountDetails(
                     sub_account_id=sub_account_details["subaccountId"],
                     sub_account_email=sub_account_details["email"],
@@ -94,6 +92,7 @@ class SubAccountDetails(models.Model):
                     is_active=True,
                 )
                 sub_account.save()
+
                 today = date.today()
                 start_date = today.strftime("%Y-%m-%d")
                 user_sub_account_object = UserSubAccount(
@@ -103,28 +102,29 @@ class SubAccountDetails(models.Model):
                     user_id_id=user_id
                 )
                 user_sub_account_object.save()
-        sub_account_details = SubAccountDetails.objects.get(account_id=user_id)
-        if not sub_account_details.is_uds_running:
+        
+        if not sub_account.is_uds_running:
             try:
                 accountable_user_details = AccountableUser.objects.get(id=user_id)
                 # deploy a job and start userdatastream
                 task_function = "q_service.tasks.deploy_user_data_stream_job"
                 task_name = (
-                    f"deploy_user_data_stream_job_{sub_account_details.sub_account_id}"
+                    f"deploy_user_data_stream_job_{sub_account.sub_account_id}"
                 )
                 hook_name = "q_service.hooks.post_deploy_user_data_stream_job"
                 async_task(
                     task_function,
                     {
-                        "api_key": sub_account_details.sub_account_api_key,
-                        "api_secret": sub_account_details.sub_account_secret,
-                        "sub_account_id:": sub_account_details.sub_account_id,
+                        "api_key": sub_account.sub_account_api_key,
+                        "api_secret": sub_account.sub_account_secret,
+                        "sub_account_id:": sub_account.sub_account_id,
                         "account_id": accountable_user_details,
                     },
                     task_name=task_name,
                     hook=hook_name,
                 )
             except Exception as e:
+                print("**Error : ",e)
                 raise e
         return sub_account
 
